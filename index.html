@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DSA Quest — Full Edition</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --gold:#f5c542;--gold-dim:#b8902a;--gold-glow:rgba(245,197,66,0.35);
+  --blue:#4fc3f7;--blue-dim:#1a6fa8;--blue-glow:rgba(79,195,247,0.3);
+  --green:#69f0ae;--red:#ef5350;--purple:#ce93d8;--orange:#ffb74d;
+  --bg:#080810;--panel:rgba(10,12,26,0.93);
+  --border:rgba(245,197,66,0.22);--border2:rgba(79,195,247,0.2);
+  --text:#e8e0cc;--muted:#7a7060;
+  --font-title:'Cinzel',serif;--font-body:'Rajdhani',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);}
+body{font-family:var(--font-body);color:var(--text);}
+#bg-canvas{position:fixed;inset:0;z-index:0;}
+#particle-canvas{position:fixed;inset:0;z-index:1;pointer-events:none;}
+#app{position:relative;z-index:10;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+
+/* SCREENS */
+.screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:opacity 0.5s,transform 0.5s;}
+.screen.hidden{opacity:0;pointer-events:none;transform:scale(0.97);}
+
+/* HUD */
+.hud-xp{position:fixed;top:20px;right:24px;z-index:100;text-align:right;}
+.hud-xp-num{font-family:var(--font-title);font-size:20px;color:var(--gold);}
+.hud-xp-lab{font-size:10px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase;}
+.hud-ch{position:fixed;top:20px;left:24px;z-index:100;}
+.hud-ch-label{font-family:var(--font-title);font-size:11px;color:var(--gold);letter-spacing:.1em;}
+.hud-ch-world{font-size:10px;color:var(--muted);margin-top:2px;letter-spacing:.08em;}
+.ch-bar{width:160px;height:3px;background:rgba(255,255,255,0.07);border-radius:2px;margin-top:6px;overflow:hidden;}
+.ch-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--blue));border-radius:2px;transition:width 0.5s cubic-bezier(.4,0,.2,1);}
+
+/* WORLD MAP SCREEN */
+#world-map{flex-direction:column;padding:20px;overflow-y:auto;}
+.world-inner{width:100%;max-width:900px;padding:70px 0 40px;}
+.world-title{font-family:var(--font-title);font-size:clamp(22px,4vw,42px);color:var(--gold);text-align:center;margin-bottom:6px;text-shadow:0 0 40px var(--gold-glow);}
+.world-sub{text-align:center;font-size:13px;color:var(--muted);letter-spacing:.12em;margin-bottom:36px;}
+.worlds-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;}
+.world-card{background:var(--panel);border:1px solid var(--border);padding:22px 24px;cursor:pointer;transition:all 0.25s;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));position:relative;overflow:hidden;}
+.world-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;transition:opacity .3s;}
+.world-card.locked{opacity:.45;cursor:not-allowed;filter:grayscale(.6);}
+.world-card:not(.locked):hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,0.5);}
+.wc-icon{font-size:28px;margin-bottom:10px;}
+.wc-name{font-family:var(--font-title);font-size:15px;color:#fff;margin-bottom:4px;}
+.wc-desc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:10px;}
+.wc-meta{display:flex;gap:10px;align-items:center;}
+.wc-badge{font-size:10px;letter-spacing:.12em;padding:3px 10px;border-radius:1px;text-transform:uppercase;}
+.wc-badge.done{background:rgba(105,240,174,.12);color:var(--green);border:1px solid rgba(105,240,174,.3);}
+.wc-badge.open{background:rgba(245,197,66,.08);color:var(--gold);border:1px solid rgba(245,197,66,.25);}
+.wc-badge.locked{background:rgba(255,255,255,.04);color:var(--muted);border:1px solid rgba(255,255,255,.1);}
+.wc-xp{font-size:11px;color:var(--muted);}
+.lock-icon{position:absolute;top:14px;right:16px;font-size:16px;color:var(--muted);}
+
+/* LANDING */
+#landing{flex-direction:column;text-align:center;}
+.hero-badge{font-family:var(--font-body);font-size:11px;letter-spacing:.25em;color:var(--gold);text-transform:uppercase;border:1px solid var(--border);padding:6px 18px;border-radius:1px;margin-bottom:24px;display:inline-block;animation:fadeUp .8s both;}
+.hero-title{font-family:var(--font-title);font-size:clamp(36px,7vw,82px);font-weight:900;color:#fff;line-height:1;text-shadow:0 0 80px var(--gold-glow),0 0 160px rgba(245,197,66,.1);animation:fadeUp .9s .1s both;}
+.hero-sub{font-family:var(--font-title);font-size:clamp(12px,2vw,20px);color:var(--gold);letter-spacing:.2em;margin-top:8px;animation:fadeUp .9s .2s both;}
+.hero-desc{font-size:15px;color:var(--muted);max-width:520px;line-height:1.9;margin:28px auto 36px;font-weight:400;animation:fadeUp .9s .3s both;}
+.total-xp-display{font-family:var(--font-title);font-size:13px;color:var(--blue);letter-spacing:.1em;margin-bottom:24px;animation:fadeUp .9s .35s both;}
+.cta-btn{font-family:var(--font-title);font-size:13px;letter-spacing:.14em;color:var(--bg);background:var(--gold);border:none;padding:16px 52px;cursor:pointer;clip-path:polygon(14px 0%,100% 0%,calc(100% - 14px) 100%,0% 100%);font-weight:600;transition:all .2s;animation:fadeUp .9s .4s both;}
+.cta-btn:hover{background:#ffe082;transform:translateY(-3px);box-shadow:0 10px 40px var(--gold-glow);}
+
+/* GAME SCREEN */
+#game-screen{flex-direction:column;padding:0 16px;overflow-y:auto;align-items:center;}
+.game-inner{width:100%;max-width:760px;padding:76px 0 56px;}
+#game-screen::-webkit-scrollbar{width:3px;}
+#game-screen::-webkit-scrollbar-thumb{background:rgba(245,197,66,.25);border-radius:2px;}
+
+/* CARDS */
+.chapter-card{background:var(--panel);border:1px solid var(--border);padding:28px 32px;margin-bottom:18px;position:relative;clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px));backdrop-filter:blur(14px);}
+.chapter-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold),transparent);}
+.question-card{background:var(--panel);border:1px solid var(--border2);padding:26px 32px;margin-bottom:18px;position:relative;clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px));backdrop-filter:blur(14px);}
+.question-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),transparent);}
+.concept-box{background:rgba(245,197,66,.03);border:1px solid rgba(245,197,66,.12);padding:14px 18px;font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:18px;}
+.concept-box span{color:var(--gold);font-weight:600;}
+.ch-tag{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);border:1px solid rgba(245,197,66,.25);padding:3px 10px;display:inline-block;margin-bottom:14px;}
+.ch-title{font-family:var(--font-title);font-size:17px;color:#fff;margin-bottom:14px;}
+.ch-story{font-size:15px;color:var(--text);line-height:1.9;font-weight:400;}
+.ch-story strong{color:var(--gold);font-weight:600;}
+.q-label{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--blue);margin-bottom:12px;}
+.q-text{font-size:15px;color:var(--text);line-height:1.7;margin-bottom:18px;}
+
+/* OPTIONS */
+.options-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.opt-btn{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);padding:13px 16px;font-family:var(--font-body);font-size:14px;color:var(--text);cursor:pointer;text-align:left;transition:all .2s;clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,0 100%);font-weight:400;}
+.opt-btn:hover:not(:disabled){border-color:rgba(245,197,66,.45);background:rgba(245,197,66,.06);color:#fff;}
+.opt-btn.correct{border-color:var(--green);background:rgba(105,240,174,.1);color:var(--green);}
+.opt-btn.incorrect{border-color:var(--red);background:rgba(239,83,80,.1);color:var(--red);}
+.opt-btn:disabled{cursor:default;}
+.type-row{display:flex;gap:9px;margin-top:4px;}
+.type-input{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.11);padding:11px 14px;font-family:var(--font-body);font-size:15px;color:#fff;letter-spacing:.08em;outline:none;transition:border-color .2s;}
+.type-input:focus{border-color:var(--gold);}
+.submit-btn{background:transparent;border:1px solid var(--gold);color:var(--gold);font-family:var(--font-title);font-size:12px;padding:11px 22px;cursor:pointer;letter-spacing:.1em;transition:all .2s;clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,0 100%);}
+.submit-btn:hover{background:var(--gold);color:var(--bg);}
+
+/* FEEDBACK */
+.feedback-box{padding:14px 18px;margin-top:14px;font-size:14px;line-height:1.75;border-left:3px solid;font-weight:400;}
+.feedback-box.good{border-color:var(--green);background:rgba(105,240,174,.07);color:#b2ffda;}
+.feedback-box.bad{border-color:var(--red);background:rgba(239,83,80,.07);color:#ffcdd2;}
+
+/* BUTTONS */
+.next-btn{font-family:var(--font-title);font-size:12px;letter-spacing:.14em;color:var(--bg);background:var(--gold);border:none;padding:13px 38px;cursor:pointer;clip-path:polygon(12px 0%,100% 0%,calc(100% - 12px) 100%,0% 100%);font-weight:600;transition:all .2s;margin-top:10px;}
+.next-btn:hover{background:#ffe082;transform:translateY(-2px);}
+.step-btn{font-family:var(--font-body);font-size:12px;letter-spacing:.1em;color:var(--blue);background:transparent;border:1px solid rgba(79,195,247,.28);padding:7px 16px;cursor:pointer;transition:all .2s;margin-top:9px;}
+.step-btn:hover{background:rgba(79,195,247,.1);}
+.step-btn:disabled{opacity:.4;cursor:default;}
+.back-map-btn{position:fixed;bottom:24px;left:24px;z-index:100;font-family:var(--font-body);font-size:11px;letter-spacing:.14em;color:var(--muted);background:transparent;border:1px solid rgba(255,255,255,.08);padding:8px 16px;cursor:pointer;transition:all .2s;}
+.back-map-btn:hover{color:var(--gold);border-color:rgba(245,197,66,.3);}
+
+/* ARRAY VISUAL */
+.arr-visual{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 6px;}
+.arr-cell{width:58px;height:58px;position:relative;}
+.arr-cell-inner{position:absolute;inset:0;background:rgba(18,22,44,.95);border:1px solid rgba(245,197,66,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all .3s cubic-bezier(.4,0,.2,1);transform:perspective(180px) rotateX(7deg);}
+.arr-cell-inner:hover{transform:perspective(180px) rotateX(0deg) translateY(-4px);border-color:var(--gold);box-shadow:0 8px 22px var(--gold-glow),inset 0 0 16px rgba(245,197,66,.06);}
+.arr-cell-inner.hi{border-color:var(--blue);background:rgba(79,195,247,.1);box-shadow:0 0 18px var(--blue-glow);}
+.arr-cell-inner.act{border-color:var(--green);background:rgba(105,240,174,.1);box-shadow:0 0 18px rgba(105,240,174,.3);animation:pulse .9s ease infinite alternate;}
+.arr-cell-inner.wrg{border-color:var(--red);background:rgba(239,83,80,.09);}
+.arr-cell-inner.pur{border-color:var(--purple);background:rgba(206,147,216,.1);box-shadow:0 0 14px rgba(206,147,216,.25);}
+.arr-cell-inner.org{border-color:var(--orange);background:rgba(255,183,77,.08);}
+.cell-val{font-family:var(--font-title);font-size:13px;color:#fff;font-weight:600;}
+.cell-idx{font-size:9px;color:var(--muted);letter-spacing:.1em;margin-top:1px;}
+.arr-cell-inner.hi .cell-val{color:var(--blue);}
+.arr-cell-inner.act .cell-val{color:var(--green);}
+.arr-cell-inner.wrg .cell-val{color:var(--red);}
+.arr-cell-inner.pur .cell-val{color:var(--purple);}
+.traverse-label{font-size:12px;color:var(--muted);margin-top:4px;letter-spacing:.09em;}
+
+/* LINKED LIST visual */
+.ll-visual{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:18px 0 6px;}
+.ll-node{display:flex;align-items:center;}
+.ll-box{background:rgba(18,22,44,.95);border:1px solid rgba(206,147,216,.4);padding:10px 14px;display:flex;gap:10px;align-items:center;transform:perspective(180px) rotateX(6deg);transition:all .3s;}
+.ll-box:hover{transform:perspective(180px) rotateX(0deg) translateY(-3px);border-color:var(--purple);box-shadow:0 6px 18px rgba(206,147,216,.2);}
+.ll-val{font-family:var(--font-title);font-size:13px;color:#fff;min-width:22px;text-align:center;}
+.ll-ptr{font-size:11px;color:var(--purple);border-left:1px solid rgba(206,147,216,.3);padding-left:8px;}
+.ll-arrow{font-size:16px;color:rgba(206,147,216,.5);margin:0 2px;}
+.ll-null{font-size:12px;color:var(--muted);font-family:var(--font-title);padding:0 6px;}
+.ll-box.hi{border-color:var(--gold);box-shadow:0 0 16px var(--gold-glow);}
+.ll-box.act{border-color:var(--green);box-shadow:0 0 16px rgba(105,240,174,.3);}
+
+/* STACK visual */
+.stack-visual{display:flex;flex-direction:column-reverse;gap:5px;margin:18px 0 6px;width:180px;}
+.stack-item{background:rgba(18,22,44,.95);border:1px solid rgba(79,195,247,.3);padding:10px 16px;font-family:var(--font-title);font-size:13px;color:#fff;text-align:center;transform:perspective(160px) rotateX(5deg);transition:all .3s;}
+.stack-item.top-item{border-color:var(--blue);background:rgba(79,195,247,.1);color:var(--blue);box-shadow:0 0 14px var(--blue-glow);}
+.stack-item.pop-anim{animation:popUp .5s ease forwards;}
+.stack-label{font-size:10px;color:var(--muted);letter-spacing:.15em;text-align:center;margin-top:4px;width:180px;}
+
+/* QUEUE visual */
+.queue-visual{display:flex;gap:5px;margin:18px 0 6px;align-items:center;}
+.queue-item{background:rgba(18,22,44,.95);border:1px solid rgba(255,183,77,.3);padding:10px 14px;font-family:var(--font-title);font-size:13px;color:#fff;text-align:center;transform:perspective(160px) rotateX(5deg);transition:all .3s;}
+.queue-item.front{border-color:var(--orange);background:rgba(255,183,77,.1);color:var(--orange);box-shadow:0 0 14px rgba(255,183,77,.25);}
+.queue-item.rear{border-color:rgba(255,183,77,.5);color:rgba(255,183,77,.6);}
+.q-end-label{font-size:10px;color:var(--muted);letter-spacing:.12em;}
+
+/* TREE visual */
+.tree-visual{margin:18px 0 6px;}
+.tree-svg text{font-family:'Cinzel',serif;font-size:11px;}
+
+/* HASH visual */
+.hash-visual{display:grid;gap:5px;margin:18px 0 6px;}
+.hash-row{display:flex;align-items:center;gap:8px;}
+.hash-idx-lbl{font-size:11px;color:var(--muted);font-family:var(--font-title);min-width:26px;text-align:right;}
+.hash-cell{background:rgba(18,22,44,.95);border:1px solid rgba(105,240,174,.25);padding:8px 14px;font-size:13px;color:#fff;font-family:var(--font-title);flex:1;transform:perspective(160px) rotateX(5deg);}
+.hash-cell.filled{border-color:var(--green);background:rgba(105,240,174,.08);color:var(--green);}
+.hash-cell.empty{color:var(--muted);font-size:11px;}
+
+/* GRAPH visual */
+.graph-svg{overflow:visible;}
+
+/* SORT visual */
+.sort-visual{display:flex;align-items:flex-end;gap:5px;margin:18px 0 6px;height:80px;}
+.sort-bar{background:rgba(79,195,247,.25);border:1px solid rgba(79,195,247,.4);border-top:2px solid var(--blue);transition:all .4s;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;}
+.sort-bar span{font-size:10px;color:var(--blue);font-family:var(--font-title);}
+.sort-bar.cmp{background:rgba(245,197,66,.2);border-color:var(--gold);border-top-color:var(--gold);}
+.sort-bar.cmp span{color:var(--gold);}
+.sort-bar.srt{background:rgba(105,240,174,.15);border-color:var(--green);border-top-color:var(--green);}
+.sort-bar.srt span{color:var(--green);}
+
+/* DP visual */
+.dp-table{border-collapse:collapse;margin:16px 0;}
+.dp-table td,.dp-table th{border:1px solid rgba(255,255,255,.1);padding:8px 14px;font-family:var(--font-title);font-size:13px;text-align:center;}
+.dp-table th{color:var(--muted);font-size:10px;letter-spacing:.12em;border-color:rgba(255,255,255,.06);}
+.dp-table td.filled{color:var(--gold);background:rgba(245,197,66,.07);}
+.dp-table td.active{color:var(--green);background:rgba(105,240,174,.1);border-color:var(--green);}
+.dp-table td.empty{color:rgba(255,255,255,.15);}
+
+/* POINTER visual */
+.ptr-visual{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 6px;}
+.ptr-indicator{font-size:11px;color:var(--muted);letter-spacing:.08em;margin-top:6px;}
+
+/* END */
+#end-screen{flex-direction:column;text-align:center;padding:20px;overflow-y:auto;}
+.end-inner{max-width:700px;padding:70px 0 40px;}
+.end-title{font-family:var(--font-title);font-size:clamp(26px,5vw,56px);color:var(--gold);text-shadow:0 0 40px var(--gold-glow);margin-bottom:10px;}
+.end-xp{font-family:var(--font-title);font-size:18px;color:#fff;margin-bottom:28px;}
+.badges-grid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:30px;}
+.badge{font-size:10px;letter-spacing:.14em;color:var(--gold);border:1px solid var(--border);padding:6px 14px;text-transform:uppercase;clip-path:polygon(7px 0%,100% 0%,calc(100% - 7px) 100%,0% 100%);background:rgba(245,197,66,.05);}
+.restart-btn{font-family:var(--font-title);font-size:12px;letter-spacing:.14em;color:var(--gold);background:transparent;border:1px solid var(--gold);padding:13px 40px;cursor:pointer;clip-path:polygon(12px 0%,100% 0%,calc(100% - 12px) 100%,0% 100%);transition:all .2s;}
+.restart-btn:hover{background:rgba(245,197,66,.1);}
+
+/* RUNE DECO */
+.rune-deco{position:fixed;font-family:var(--font-title);font-size:10px;color:rgba(245,197,66,.07);letter-spacing:.3em;text-transform:uppercase;pointer-events:none;}
+.rune-deco.tl{top:44px;left:24px;}
+.rune-deco.br{bottom:24px;right:24px;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:translateY(0);}}
+@keyframes pulse{from{box-shadow:0 0 8px rgba(105,240,174,.3);}to{box-shadow:0 0 24px rgba(105,240,174,.7);}}
+@keyframes popUp{0%{transform:perspective(160px) rotateX(5deg) scale(1);}50%{transform:perspective(160px) rotateX(0deg) scale(1.1) translateY(-10px);opacity:.5;}100%{transform:perspective(160px) rotateX(5deg) scale(1);opacity:0;}}
+@keyframes floatIn{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+.anim-in{animation:floatIn .45s cubic-bezier(.4,0,.2,1) both;}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<canvas id="particle-canvas"></canvas>
+
+<div class="hud-xp hidden" id="hud-xp">
+  <div class="hud-xp-num" id="hud-xp-val">0</div>
+  <div class="hud-xp-lab">XP</div>
+</div>
+<div class="hud-ch hidden" id="hud-ch">
+  <div class="hud-ch-label" id="hud-ch-label">Chapter 1</div>
+  <div class="hud-ch-world" id="hud-ch-world">World 1</div>
+  <div class="ch-bar"><div class="ch-fill" id="hud-ch-fill" style="width:0%"></div></div>
+</div>
+<div class="rune-deco tl">DSA Quest · Full Edition</div>
+<div class="rune-deco br">10 Worlds · 40 Chapters</div>
+
+<div id="app">
+  <!-- LANDING -->
+  <div class="screen" id="landing">
+    <div style="text-align:center;">
+      <div class="hero-badge">Complete DSA Learning Adventure</div>
+      <div class="hero-title">DSA Quest</div>
+      <div class="hero-sub">Full Edition — All Realms</div>
+      <div class="hero-desc">Journey through 10 kingdoms of computer science. Master every data structure and algorithm through epic storytelling, 3D puzzles, and royal challenges.</div>
+      <div class="total-xp-display" id="landing-xp">Total XP: 0 / 400</div>
+      <button class="cta-btn" onclick="showWorldMap()">Enter the Realm</button>
+    </div>
+  </div>
+
+  <!-- WORLD MAP -->
+  <div class="screen hidden" id="world-map">
+    <div class="world-inner" id="world-inner">
+      <div class="world-title">Choose Your Kingdom</div>
+      <div class="world-sub">Select a world to begin your quest</div>
+      <div class="worlds-grid" id="worlds-grid"></div>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div class="screen hidden" id="game-screen">
+    <div class="game-inner" id="game-inner"></div>
+    <button class="back-map-btn" onclick="goToWorldMap()">← World Map</button>
+  </div>
+
+  <!-- END -->
+  <div class="screen hidden" id="end-screen">
+    <div class="end-inner">
+      <div class="end-title">All Realms Conquered!</div>
+      <div class="end-xp" id="end-xp-val">400 / 400 XP</div>
+      <div class="badges-grid" id="end-badges"></div>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:30px;line-height:1.9;">You are the Grand Champion of Arrayonia. Every data structure bows before you.</p>
+      <button class="restart-btn" onclick="fullRestart()">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── THREE.JS BG ──────────────────────────────────────────────────────────────
+(function(){
+  const c=document.getElementById('bg-canvas');
+  const r=new THREE.WebGLRenderer({canvas:c,antialias:true,alpha:true});
+  r.setPixelRatio(Math.min(devicePixelRatio,2));
+  r.setSize(innerWidth,innerHeight);
+  r.setClearColor(0x080810,1);
+  const scene=new THREE.Scene();
+  const cam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,1000);
+  cam.position.set(0,0,20);
+  scene.add(new THREE.AmbientLight(0x112244,2));
+  const l1=new THREE.PointLight(0xf5c542,4,70); l1.position.set(-12,10,10); scene.add(l1);
+  const l2=new THREE.PointLight(0x4fc3f7,3,70); l2.position.set(12,-8,6); scene.add(l2);
+  const l3=new THREE.PointLight(0x9c27b0,2,50); l3.position.set(0,0,10); scene.add(l3);
+  const l4=new THREE.PointLight(0x69f0ae,1.5,40); l4.position.set(-5,-12,4); scene.add(l4);
+  const shapes=[new THREE.BoxGeometry(1.3,1.3,1.3),new THREE.OctahedronGeometry(0.9),new THREE.TetrahedronGeometry(1),new THREE.IcosahedronGeometry(0.8)];
+  const objs=[];
+  const positions=[[-10,5,-9],[-6,7,-13],[-2,8,-11],[2,7,-10],[6,6,-9],[10,4,-12],[-8,-5,-11],[-4,-7,-9],[0,-6,-13],[4,-4,-10],[8,-6,-12],[-12,1,-8],[12,2,-11],[-7,3,-15],[7,-2,-14],[0,10,-16],[5,0,-7],[-5,-1,-8]];
+  positions.forEach((pos,i)=>{
+    const geo=shapes[i%shapes.length];
+    const mat=new THREE.MeshPhongMaterial({color:0x0c1035,transparent:true,opacity:.75,shininess:150,specular:0x4fc3f7});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(...pos);
+    mesh.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
+    scene.add(mesh);
+    const wmat=new THREE.MeshBasicMaterial({color:[0xf5c542,0x4fc3f7,0xce93d8,0x69f0ae,0xffb74d][i%5],transparent:true,opacity:.15,wireframe:true});
+    const wm=new THREE.Mesh(geo,wmat);
+    wm.position.set(...pos);
+    scene.add(wm);
+    objs.push({m:mesh,w:wm,sp:.002+Math.random()*.004,ph:Math.random()*Math.PI*2});
+  });
+  const sg=new THREE.BufferGeometry();
+  const sa=new Float32Array(800*3);
+  for(let i=0;i<800*3;i++) sa[i]=(Math.random()-.5)*140;
+  sg.setAttribute('position',new THREE.BufferAttribute(sa,3));
+  scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:.1,transparent:true,opacity:.4})));
+  const gh=new THREE.GridHelper(80,35,0x1a1a40,0x0f0f30);
+  gh.position.y=-16; scene.add(gh);
+  let mx=0,my=0,t=0;
+  document.addEventListener('mousemove',e=>{mx=(e.clientX/innerWidth-.5);my=(e.clientY/innerHeight-.5);});
+  function anim(){
+    requestAnimationFrame(anim); t+=.01;
+    objs.forEach(o=>{
+      o.m.rotation.x+=o.sp; o.m.rotation.y+=o.sp*.8;
+      o.m.position.y+=Math.sin(t+o.ph)*.005;
+      o.w.rotation.copy(o.m.rotation); o.w.position.copy(o.m.position);
+    });
+    cam.position.x+=(mx*2.5-cam.position.x)*.025;
+    cam.position.y+=(-my*2-cam.position.y)*.025;
+    cam.lookAt(0,0,0);
+    l1.position.x=Math.sin(t*.4)*14; l1.position.y=Math.cos(t*.3)*9;
+    l2.position.x=Math.cos(t*.3)*12; l2.position.z=Math.sin(t*.5)*8+6;
+    r.render(scene,cam);
+  }
+  anim();
+  window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();r.setSize(innerWidth,innerHeight);});
+})();
+
+// ── PARTICLES ────────────────────────────────────────────────────────────────
+(function(){
+  const c=document.getElementById('particle-canvas');
+  const ctx=c.getContext('2d');
+  c.width=innerWidth; c.height=innerHeight;
+  const pts=Array.from({length:50},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.4+.3,dx:(Math.random()-.5)*.25,dy:-Math.random()*.35-.08,a:Math.random()*.35+.1}));
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`rgba(245,197,66,${p.a})`;ctx.fill();p.x+=p.dx;p.y+=p.dy;if(p.y<-5){p.y=c.height+5;p.x=Math.random()*c.width;}});
+    requestAnimationFrame(draw);
+  }
+  draw();
+  window.addEventListener('resize',()=>{c.width=innerWidth;c.height=innerHeight;});
+})();
+
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const WORLDS = [
+  {
+    id:'arrays', name:'Arrays & Strings', icon:'📦', color:'#f5c542',
+    desc:'The Royal Inventory. Master indexing, traversal, and string manipulation.',
+    totalXP:40,
+    chapters:[
+      {tag:'Array Indexing',title:'Chapter I — The Royal Shelf',
+       story:'You are the Royal Inventory Keeper of <strong>Arrayonia</strong>. The King stores treasures on a magical shelf — an <strong>Array</strong> — numbered from <strong>0</strong>. Shelf holds: Sword, Shield, Potion, Map, Crown.',
+       visual:{type:'array',items:['Sword','Shield','Potion','Map','Crown'],hi:[]},
+       q:'The King demands item at index 2. What does he get?',type:'mcq',
+       opts:['Sword','Shield','Potion','Map'],correct:2,hiOnReveal:[2],
+       fb_good:'Correct! Index 0=Sword, 1=Shield, 2=Potion. Arrays start at 0!',
+       fb_bad:'Arrays count from 0. The 3rd box is index 2 = Potion.',
+       concept:'Arrays use zero-based indexing. Element at index i = (i+1)th item.',xp:10},
+      {tag:'Array Length',title:'Chapter II — The Arriving Merchant',
+       story:'A merchant arrives with a <strong>Gem</strong>. The shelf has 5 items. You need the next empty slot. Remember: last index = length − 1.',
+       visual:{type:'array',items:['Sword','Shield','Potion','Map','Crown'],hi:[]},
+       q:'The array length is 5. At what index does the appended Gem go?',type:'mcq',
+       opts:['Index 4','Index 5','Index 6','Index 0'],correct:1,hiOnReveal:[],
+       fb_good:'Brilliant! Append to length-5 array → index 5. Last item = index 4.',
+       fb_bad:'Crown is at index 4. New item goes to index 5 = current length.',
+       concept:'Last index = length−1. Appended item always goes to index = length.',xp:10},
+      {tag:'Traversal',title:'Chapter III — The Census March',
+       story:'The King orders a full count. You walk the shelf from first to last — visiting every item once. This is <strong>Traversal</strong>. Shelf: [Apple, Bread, Candle, Drum, Egg].',
+       visual:{type:'traverse',items:['Apple','Bread','Candle','Drum','Egg']},
+       q:'Traversal visits indices 0,1,2,3,4. Total items visited?',type:'mcq',
+       opts:['4','5','6','Depends'],correct:1,hiOnReveal:[],
+       fb_good:'Yes! 5 items, one visit each. Traversal = O(n) time.',
+       fb_bad:'Indices 0 through 4 = 5 visits. Every element, once.',
+       concept:'Traversal visits each element once, index 0 to n−1. Time: O(n).',xp:10},
+      {tag:'String as Array',title:'Chapter IV — The Enchanted Message',
+       story:'The wizard receives <strong>"HELLO"</strong>. A string is an <strong>array of characters</strong>! H=0, E=1, L=2, L=3, O=4.',
+       visual:{type:'array',items:['H','E','L','L','O'],hi:[]},
+       q:'What character is at index 3?',type:'mcq',
+       opts:['H','E','First L','Second L'],correct:3,hiOnReveal:[3],
+       fb_good:'Right! Index 3 = second L. Strings are just char arrays!',
+       fb_bad:'H=0, E=1, L=2, L=3. Index 3 = second L.',
+       concept:'A string is an array of characters. All array rules apply.',xp:10},
+    ]
+  },
+  {
+    id:'linked-list', name:'Linked Lists', icon:'🔗', color:'#ce93d8',
+    desc:'The Chain of Scrolls. Nodes, pointers, and dynamic memory.',
+    totalXP:40,
+    chapters:[
+      {tag:'Linked List Nodes',title:'Chapter I — The Chain of Scrolls',
+       story:'In the <strong>Library of Links</strong>, scrolls are stored as a chain. Each scroll (<strong>node</strong>) holds a value and a <strong>pointer</strong> to the next scroll. The last scroll points to <strong>NULL</strong>.',
+       visual:{type:'ll',nodes:['10','20','30','40'],hi:[]},
+       q:'A node in a linked list contains what two things?',type:'mcq',
+       opts:['Two values','Value and index','Value and next pointer','Two pointers'],correct:2,hiOnReveal:[],
+       fb_good:'Exactly! Each node stores data + a pointer to the next node.',
+       fb_bad:'A linked list node has: (1) the stored value, (2) a pointer to the next node.',
+       concept:'LinkedList node = {data, next}. Last node\'s next = NULL.',xp:10},
+      {tag:'Traversal',title:'Chapter II — Reading the Chain',
+       story:'To read all scrolls, start at the <strong>Head</strong> and follow the chain pointer by pointer until you reach <strong>NULL</strong>. Chain: 10 → 20 → 30 → 40 → NULL.',
+       visual:{type:'ll',nodes:['10','20','30','40'],hi:[]},
+       q:'How many steps does it take to reach node with value 30 starting from Head?',type:'mcq',
+       opts:['1 step','2 steps','3 steps','0 steps'],correct:1,hiOnReveal:[],
+       fb_good:'Correct! Head→10 (step 1)→20 (step 2)→30. Takes 2 pointer follows.',
+       fb_bad:'Start at 10 (head). Follow to 20 = step 1. Follow to 30 = step 2.',
+       concept:'LL traversal: start at head, follow next pointers. O(n) time.',xp:10},
+      {tag:'Insertion',title:'Chapter III — The New Scroll',
+       story:'A new scroll with value <strong>25</strong> must be inserted between 20 and 30. You update: 20\'s pointer → 25, and 25\'s pointer → 30. No other scrolls need to move!',
+       visual:{type:'ll',nodes:['10','20','25','30','40'],hi:[2]},
+       q:'What is the main advantage of linked list insertion vs array insertion?',type:'mcq',
+       opts:['O(1) access time','No shifting required','Less memory','Better cache'],correct:1,hiOnReveal:[],
+       fb_good:'Yes! In a linked list you only update 2 pointers — no shifting O(n) elements like an array!',
+       fb_bad:'Arrays need O(n) shifting. LL only updates 2 pointers: prev.next=new, new.next=next.',
+       concept:'LL insertion: update prev.next and new.next. O(1) if at position, O(n) to find it.',xp:10},
+      {tag:'Deletion',title:'Chapter IV — The Lost Scroll',
+       story:'The scroll with value 20 must be removed. Simply set the pointer of scroll 10 to skip directly to scroll 30. Scroll 20 is now unreachable — deleted!',
+       visual:{type:'ll',nodes:['10','30','40'],hi:[]},
+       q:'After deleting node 20 from 10→20→30, what does node 10\'s next pointer point to?',type:'mcq',
+       opts:['NULL','Node 20','Node 30','Node 10 itself'],correct:2,hiOnReveal:[],
+       fb_good:'Correct! After deletion, node 10 skips directly to node 30.',
+       fb_bad:'Deletion means: node_10.next = node_30, bypassing node_20.',
+       concept:'LL deletion: prev.next = curr.next. Removed node is garbage collected.',xp:10},
+    ]
+  },
+  {
+    id:'stacks', name:'Stacks & Queues', icon:'🏛️', color:'#4fc3f7',
+    desc:'The Tower of Choices. LIFO and FIFO — the art of ordered access.',
+    totalXP:40,
+    chapters:[
+      {tag:'Stack — LIFO',title:'Chapter I — The Tower of Shields',
+       story:'The royal armourer stacks shields. Only the <strong>top</strong> shield can be picked up — the one added last. This is a <strong>Stack</strong>: Last In, First Out (<strong>LIFO</strong>). Push = add to top, Pop = remove from top.',
+       visual:{type:'stack',items:['Shield A','Shield B','Shield C'],topIdx:2},
+       q:'If we push "Shield D" onto the stack, which shield is now at the top?',type:'mcq',
+       opts:['Shield A','Shield B','Shield C','Shield D'],correct:3,hiOnReveal:[],
+       fb_good:'Exactly! Push always goes to the top. Shield D is now the LIFO top.',
+       fb_bad:'Push adds to the top. Shield D was pushed last, so it\'s on top.',
+       concept:'Stack: LIFO. Push adds to top, Pop removes from top. Both O(1).',xp:10},
+      {tag:'Stack — Pop',title:'Chapter II — The Armour Recall',
+       story:'The King calls back the last shield placed. You <strong>Pop</strong> from the stack. Stack (top to bottom): Shield D, Shield C, Shield B, Shield A. After popping once...',
+       visual:{type:'stack',items:['Shield A','Shield B','Shield C'],topIdx:2},
+       q:'After one pop from [D, C, B, A] (D is top), what is the new top?',type:'mcq',
+       opts:['Shield A','Shield B','Shield C','Shield D'],correct:2,hiOnReveal:[],
+       fb_good:'Correct! D is popped (removed), leaving C as the new top.',
+       fb_bad:'Pop removes the top element (D). Next element down (C) becomes the new top.',
+       concept:'Pop: removes and returns top element. Stack shrinks by 1. O(1).',xp:10},
+      {tag:'Queue — FIFO',title:'Chapter III — The Royal Queue',
+       story:'Citizens wait in line for the royal feast. The first citizen to arrive is served first — <strong>First In, First Out</strong> (<strong>FIFO</strong>). This is a <strong>Queue</strong>. Enqueue = join at rear, Dequeue = leave from front.',
+       visual:{type:'queue',items:['Alice','Bob','Charlie','Diana']},
+       q:'If we dequeue once from [Alice, Bob, Charlie, Diana] (Alice is front), who leaves?',type:'mcq',
+       opts:['Diana','Charlie','Bob','Alice'],correct:3,hiOnReveal:[],
+       fb_good:'Right! Alice was first in, so she\'s first out. FIFO!',
+       fb_bad:'Queue = FIFO. Alice is at the front (arrived first) and leaves first.',
+       concept:'Queue: FIFO. Enqueue at rear, Dequeue from front. Both O(1).',xp:10},
+      {tag:'Applications',title:'Chapter IV — When to Use Which?',
+       story:'The wise advisor teaches: <strong>Stacks</strong> are perfect for "undo" history, function call tracking, and bracket matching. <strong>Queues</strong> are perfect for task scheduling, BFS, and print queues.',
+       visual:{type:'stack',items:['func_c()','func_b()','func_a()'],topIdx:2},
+       q:'A browser\'s Back button (undo last page) uses which structure?',type:'mcq',
+       opts:['Queue (FIFO)','Stack (LIFO)','Array','Linked List'],correct:1,hiOnReveal:[],
+       fb_good:'Yes! Each page visited is pushed. Back button pops the last page. Classic stack usage!',
+       fb_bad:'Back = undo last action = LIFO = Stack. You return to the LAST page visited.',
+       concept:'Stack use cases: undo, call stack, brackets. Queue: BFS, scheduling, streaming.',xp:10},
+    ]
+  },
+  {
+    id:'trees', name:'Trees & BST', icon:'🌳', color:'#69f0ae',
+    desc:'The Forest of Decisions. Hierarchical data and binary search.',
+    totalXP:40,
+    chapters:[
+      {tag:'Tree Basics',title:'Chapter I — The Family Tree of Arrayonia',
+       story:'The royal genealogist maps the royal family as a <strong>Tree</strong>. The King is the <strong>Root</strong>. His children are <strong>child nodes</strong>. Nodes with no children are <strong>Leaves</strong>.',
+       visual:{type:'tree',nodes:[{v:50,x:200,y:30},{v:30,x:100,y:90},{v:70,x:300,y:90},{v:20,x:50,y:150},{v:40,x:150,y:150},{v:60,x:250,y:150},{v:80,x:350,y:150}],edges:[[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]],hi:[]},
+       q:'In a tree, a node with no children is called a...?',type:'mcq',
+       opts:['Root','Branch','Leaf','Edge'],correct:2,hiOnReveal:[],
+       fb_good:'Correct! Leaf nodes have no children. They are the endpoints of the tree.',
+       fb_bad:'A node with no children = Leaf. Root = topmost node. Edge = connection.',
+       concept:'Tree: Root (top), Parent, Child, Leaf (no children). Height = longest root-to-leaf path.',xp:10},
+      {tag:'BST Property',title:'Chapter II — The Sorted Kingdom',
+       story:'In a <strong>Binary Search Tree</strong>, every node follows one law: left child < parent < right child. Root = 50. All values left of 50 are smaller, all right are larger. This makes searching lightning fast!',
+       visual:{type:'tree',nodes:[{v:50,x:200,y:30},{v:30,x:100,y:90},{v:70,x:300,y:90},{v:20,x:50,y:150},{v:40,x:150,y:150},{v:60,x:250,y:150},{v:80,x:350,y:150}],edges:[[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]],hi:[0,2,6]},
+       q:'Searching for 70 in BST rooted at 50. First comparison: 70 > 50, so you go...?',type:'mcq',
+       opts:['Left subtree','Right subtree','Start over','Check all nodes'],correct:1,hiOnReveal:[],
+       fb_good:'Exactly! 70 > 50, so go right. BST halves the search space each step — O(log n)!',
+       fb_bad:'BST rule: value > node → go right. 70>50 → go right, find 70. O(log n) search!',
+       concept:'BST: left < node < right. Search, insert, delete = O(log n) avg, O(n) worst.',xp:10},
+      {tag:'Tree Traversal',title:'Chapter III — The Inorder Parade',
+       story:'To list the royal family in order, use <strong>Inorder traversal</strong>: visit Left subtree → Root → Right subtree. For BST, this gives sorted output! Order for our tree: 20, 30, 40, 50, 60, 70, 80.',
+       visual:{type:'tree',nodes:[{v:50,x:200,y:30},{v:30,x:100,y:90},{v:70,x:300,y:90},{v:20,x:50,y:150},{v:40,x:150,y:150},{v:60,x:250,y:150},{v:80,x:350,y:150}],edges:[[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]],hi:[3,1,4,0,5,2,6]},
+       q:'Preorder traversal visits: Root → Left → Right. For our BST, what is first?',type:'mcq',
+       opts:['20','30','50','80'],correct:2,hiOnReveal:[],
+       fb_good:'Correct! Preorder starts at Root. Root = 50 is visited first.',
+       fb_bad:'Preorder = Root first. The root of our BST is 50.',
+       concept:'Inorder (L→R→R): sorted output for BST. Preorder: Root first. Postorder: Root last.',xp:10},
+      {tag:'Tree Height',title:'Chapter IV — The Tower of Ancestry',
+       story:'The <strong>height</strong> of a tree is the number of edges on the longest path from root to a leaf. Our BST has 3 levels (root=level 0, leaves=level 2). A balanced tree of n nodes has height ≈ log₂(n).',
+       visual:{type:'tree',nodes:[{v:50,x:200,y:30},{v:30,x:100,y:90},{v:70,x:300,y:90},{v:20,x:50,y:150},{v:40,x:150,y:150},{v:60,x:250,y:150},{v:80,x:350,y:150}],edges:[[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]],hi:[]},
+       q:'A balanced BST with 7 nodes has height...?',type:'mcq',
+       opts:['7','3','2','1'],correct:2,hiOnReveal:[],
+       fb_good:'Yes! Height = ⌊log₂(7)⌋ = 2. Balanced trees keep height minimal — efficient!',
+       fb_bad:'Balanced BST height = ⌊log₂(n)⌋. For n=7: ⌊log₂(7)⌋ = 2.',
+       concept:'Balanced BST height = O(log n). Unbalanced (skewed) worst case = O(n).',xp:10},
+    ]
+  },
+  {
+    id:'graphs', name:'Graphs & BFS/DFS', icon:'🗺️', color:'#ffb74d',
+    desc:'The Map of Kingdoms. Vertices, edges, and pathfinding.',
+    totalXP:40,
+    chapters:[
+      {tag:'Graph Basics',title:'Chapter I — The Kingdom Map',
+       story:'The map of Arrayonia shows cities connected by roads. Cities are <strong>vertices</strong>, roads are <strong>edges</strong>. A graph can be <strong>directed</strong> (one-way roads) or <strong>undirected</strong> (two-way). It may have <strong>cycles</strong> (loops).',
+       visual:{type:'graph',nodes:[{id:0,label:'A',x:100,y:60},{id:1,label:'B',x:240,y:30},{id:2,label:'C',x:320,y:110},{id:3,label:'D',x:200,y:150},{id:4,label:'E',x:60,y:150}],edges:[[0,1],[1,2],[2,3],[3,0],[0,4],[4,3]],directed:false,hi:[]},
+       q:'A city with 3 roads connecting to it has a degree of...?',type:'mcq',
+       opts:['1','2','3','4'],correct:2,hiOnReveal:[],
+       fb_good:'Correct! Degree = number of edges connected to a vertex. 3 roads = degree 3.',
+       fb_bad:'Degree of a vertex = count of edges attached. 3 roads = degree 3.',
+       concept:'Graph: vertices (nodes) + edges. Degree = number of edges at a vertex.',xp:10},
+      {tag:'BFS',title:'Chapter II — The Royal Messenger (BFS)',
+       story:'The royal messenger starts at city <strong>A</strong> and visits all cities by exploring layer by layer — first all cities 1 hop away, then 2 hops away. This is <strong>Breadth-First Search (BFS)</strong>. Uses a <strong>Queue</strong>!',
+       visual:{type:'graph',nodes:[{id:0,label:'A',x:100,y:80},{id:1,label:'B',x:220,y:30},{id:2,label:'C',x:300,y:100},{id:3,label:'D',x:220,y:160},{id:4,label:'E',x:40,y:160}],edges:[[0,1],[0,3],[0,4],[1,2],[3,2]],directed:false,hi:[0,1,3,4,2]},
+       q:'BFS from A visits neighbors first. Which data structure does BFS use internally?',type:'mcq',
+       opts:['Stack','Queue','Array','Hash Table'],correct:1,hiOnReveal:[],
+       fb_good:'Exactly! BFS uses a Queue (FIFO) to explore level by level. Enqueue neighbors, dequeue to visit.',
+       fb_bad:'BFS visits level by level (nearest first) using a Queue. DFS uses a Stack.',
+       concept:'BFS: level-by-level traversal using a Queue. Time: O(V+E). Finds shortest path in unweighted graphs.',xp:10},
+      {tag:'DFS',title:'Chapter III — The Explorer Scout (DFS)',
+       story:'The scout explores as <strong>deep as possible</strong> before backtracking. Starting at A: go to B, then C (dead end), backtrack, go to D... This is <strong>Depth-First Search (DFS)</strong>. Uses a <strong>Stack</strong> (or recursion)!',
+       visual:{type:'graph',nodes:[{id:0,label:'A',x:100,y:80},{id:1,label:'B',x:220,y:30},{id:2,label:'C',x:320,y:60},{id:3,label:'D',x:220,y:140},{id:4,label:'E',x:60,y:160}],edges:[[0,1],[1,2],[0,3],[3,4],[0,4]],directed:false,hi:[0,1,2,3,4]},
+       q:'DFS goes deep first. What is the main data structure or technique DFS uses?',type:'mcq',
+       opts:['Queue','Stack or Recursion','Linked List','Hash Map'],correct:1,hiOnReveal:[],
+       fb_good:'Yes! DFS uses a Stack (explicitly) or the call stack (recursion). It dives deep before exploring siblings.',
+       fb_bad:'DFS = Stack (LIFO) or recursion. Each call goes deeper until a dead end, then backtracks.',
+       concept:'DFS: explore deep first using Stack/recursion. Time: O(V+E). Good for path finding & cycle detection.',xp:10},
+      {tag:'Applications',title:'Chapter IV — The Grand Strategy',
+       story:'The Grand Strategist uses graphs everywhere: road networks, social connections, web pages. <strong>BFS</strong> finds the shortest route (fewest hops). <strong>DFS</strong> checks if all cities are reachable and detects cycles.',
+       visual:{type:'graph',nodes:[{id:0,label:'Home',x:80,y:90},{id:1,label:'Work',x:220,y:30},{id:2,label:'Shop',x:320,y:90},{id:3,label:'Park',x:220,y:160}],edges:[[0,1],[1,2],[2,3],[3,0],[0,2]],directed:false,hi:[]},
+       q:'You want the fewest road-hops from Home to Shop. Which algorithm do you use?',type:'mcq',
+       opts:['DFS','BFS','Binary Search','Linear Search'],correct:1,hiOnReveal:[],
+       fb_good:'BFS! It explores level by level and guarantees the shortest path in unweighted graphs.',
+       fb_bad:'Shortest path (fewest hops, unweighted) = BFS. DFS finds A path but not necessarily the shortest.',
+       concept:'BFS = shortest path (unweighted). DFS = connectivity, cycle detection, topological sort.',xp:10},
+    ]
+  },
+  {
+    id:'hashing', name:'Hashing', icon:'#️⃣', color:'#69f0ae',
+    desc:'The Magic Index. O(1) lookups with hash functions and tables.',
+    totalXP:40,
+    chapters:[
+      {tag:'Hash Function',title:'Chapter I — The Royal Index Spell',
+       story:'The royal librarian uses a magic spell (<strong>hash function</strong>) to instantly find any book. The spell maps any book title to a <strong>bucket number</strong> (index). Example: hash("Apple") = 2, hash("Banana") = 4.',
+       visual:{type:'hash',pairs:[{k:'Apple',v:'Apple',idx:2},{k:'Banana',v:'Banana',idx:4},{k:'Cherry',v:'Cherry',idx:1}],size:6},
+       q:'A hash function\'s main goal is to map a key to...?',type:'mcq',
+       opts:['A sorted list','A bucket/index','Another key','A linked list'],correct:1,hiOnReveal:[],
+       fb_good:'Exactly! The hash function maps any key to an index (bucket number) in the array.',
+       fb_bad:'Hash function: key → index. This index tells you exactly where to store/find the value.',
+       concept:'Hash function: maps key → index. Good hash functions distribute keys uniformly.',xp:10},
+      {tag:'O(1) Lookup',title:'Chapter II — The Instant Search',
+       story:'With a hash table, finding any value takes <strong>O(1)</strong> — constant time — regardless of how many items are stored. You hash the key, jump to that index directly. No scanning needed!',
+       visual:{type:'hash',pairs:[{k:'Name',v:'"Alice"',idx:1},{k:'Age',v:'25',idx:3},{k:'City',v:'"Kolkata"',idx:5}],size:7},
+       q:'You look up key "Age" in a hash table of 1 million entries. How long does it take?',type:'mcq',
+       opts:['O(n) — scan all','O(log n) — binary','O(1) — direct','O(n²)'],correct:2,hiOnReveal:[],
+       fb_good:'O(1)! Hash the key, jump to index, done. Size of table doesn\'t matter.',
+       fb_bad:'Hash tables: hash(key) → index → jump directly. Always O(1) average, size irrelevant.',
+       concept:'Hash Table lookup/insert/delete: O(1) average. Best data structure for key-value storage.',xp:10},
+      {tag:'Collision',title:'Chapter III — The Double Booking',
+       story:'Two books map to the same index — a <strong>collision</strong>! hash("Cat")=3 and hash("Cab")=3. Solutions: <strong>Chaining</strong> (linked list at each bucket) or <strong>Open Addressing</strong> (probe next slot).',
+       visual:{type:'hash',pairs:[{k:'Cat',v:'Cat',idx:3},{k:'Cab',v:'Cab',idx:3}],size:6},
+       q:'Two keys map to the same index. What is this called?',type:'type',
+       correct_text:'COLLISION',
+       fb_good:'Exactly — a Collision! Handled by chaining (lists in buckets) or open addressing (probing).',
+       fb_bad:'When two keys map to the same index, that\'s a Collision. Type: COLLISION',
+       concept:'Collision: two keys hash to same index. Chaining uses linked lists per bucket. Open addressing probes.',xp:10},
+      {tag:'Applications',title:'Chapter IV — The Registry of All Things',
+       story:'Hash tables power countless real systems: Python dicts, JavaScript objects, database indexes, caches, and counting frequencies. If you need fast lookup by key, reach for a hash table.',
+       visual:{type:'hash',pairs:[{k:'alice',v:'3 visits',idx:0},{k:'bob',v:'5 visits',idx:2},{k:'carol',v:'1 visit',idx:4}],size:6},
+       q:'Counting frequency of each word in a document — best structure?',type:'mcq',
+       opts:['Array','Linked List','Hash Table','Stack'],correct:2,hiOnReveal:[],
+       fb_good:'Hash Table! Map word→count. Each word lookup/update is O(1). Perfect for frequency counting.',
+       fb_bad:'Frequency counting: word→count mapping. Hash Table gives O(1) per word. Arrays need linear scan.',
+       concept:'Hash Table = word→count, caches, sets, deduplication. The go-to for O(1) key-based operations.',xp:10},
+    ]
+  },
+  {
+    id:'sorting', name:'Sorting Algorithms', icon:'🔢', color:'#f5c542',
+    desc:'The Order of Things. Bubble, Merge, Quick — from O(n²) to O(n log n).',
+    totalXP:40,
+    chapters:[
+      {tag:'Bubble Sort',title:'Chapter I — The Bubble Parade',
+       story:'Bubble Sort compares adjacent elements and swaps if out of order, repeating until sorted. Largest elements "bubble up" to the right. Simple but slow — <strong>O(n²)</strong>. Array: [5,3,8,1,4].',
+       visual:{type:'sort',items:[5,3,8,1,4],cmp:[0,1]},
+       q:'Bubble Sort compares and swaps adjacent elements. Its time complexity is...?',type:'mcq',
+       opts:['O(n)','O(n log n)','O(n²)','O(log n)'],correct:2,hiOnReveal:[],
+       fb_good:'Yes, O(n²)! Nested loops: outer for passes, inner for comparisons. Not efficient for large data.',
+       fb_bad:'Bubble Sort: outer loop × inner loop = O(n) × O(n) = O(n²). Fine for small arrays.',
+       concept:'Bubble Sort: O(n²) time, O(1) space. Stable. Good for educational purposes and nearly-sorted data.',xp:10},
+      {tag:'Merge Sort',title:'Chapter II — The Divide & Conquer Army',
+       story:'Merge Sort <strong>divides</strong> the array in half repeatedly until single elements remain, then <strong>merges</strong> them back in sorted order. Always <strong>O(n log n)</strong> — efficient and reliable!',
+       visual:{type:'sort',items:[3,1,4,1,5],cmp:[]},
+       q:'Merge Sort splits the array in half each time. This gives it what time complexity?',type:'mcq',
+       opts:['O(n²)','O(n log n)','O(n)','O(log n)'],correct:1,hiOnReveal:[],
+       fb_good:'O(n log n)! log n levels of splitting × n work per merge. Much better than O(n²).',
+       fb_bad:'Merge Sort: log n splits × n merge work = O(n log n). Guaranteed — no bad cases.',
+       concept:'Merge Sort: O(n log n) always. Divide & Conquer. Stable. Extra O(n) space for merging.',xp:10},
+      {tag:'Quick Sort',title:'Chapter III — The Pivot Champion',
+       story:'Quick Sort picks a <strong>pivot</strong>, partitions elements (smaller left, larger right), and recursively sorts each side. Average <strong>O(n log n)</strong>, worst O(n²) if pivot is always min/max. Often fastest in practice!',
+       visual:{type:'sort',items:[7,2,9,4,6],cmp:[2]},
+       q:'Quick Sort\'s worst case O(n²) occurs when the pivot is always the smallest or largest element. This happens with which input?',type:'mcq',
+       opts:['Random array','Already sorted array','Array of equal elements','Reversed array'],correct:1,hiOnReveal:[],
+       fb_good:'Yes! Already sorted (or reverse sorted) arrays cause Quick Sort\'s worst case with naive pivot selection.',
+       fb_bad:'Sorted arrays with first-element pivot = worst case: pivot is always min, giving O(n²) partitions.',
+       concept:'Quick Sort: O(n log n) avg, O(n²) worst. In-place. Fastest in practice for most inputs.',xp:10},
+      {tag:'Comparison',title:'Chapter IV — The Sorting Tournament',
+       story:'The Grand Tournament of Sorting: <strong>Bubble Sort</strong> O(n²) — slow but simple. <strong>Merge Sort</strong> O(n log n) always — stable, needs extra space. <strong>Quick Sort</strong> O(n log n) avg — fast, in-place. For nearly-sorted data, <strong>Insertion Sort</strong> wins!',
+       visual:{type:'sort',items:[1,2,3,4,5],cmp:[]},
+       q:'For 1 million random elements, which algorithm is MOST efficient?',type:'mcq',
+       opts:['Bubble Sort','Insertion Sort','Merge Sort','Linear Scan'],correct:2,hiOnReveal:[],
+       fb_good:'Merge Sort (or Quick Sort avg)! O(n log n) vs O(n²). For 1M elements: 20M vs 1 trillion operations!',
+       fb_bad:'O(n log n) algorithms (Merge/Quick) are essential for large n. Bubble = 10^12 ops for n=10^6.',
+       concept:'Choose: Merge Sort (stable, guaranteed), Quick Sort (fast avg), Insertion Sort (nearly sorted).',xp:10},
+    ]
+  },
+  {
+    id:'recursion', name:'Recursion & DP', icon:'♾️', color:'#ce93d8',
+    desc:'The Hall of Mirrors. Self-referential solutions and optimal subproblems.',
+    totalXP:40,
+    chapters:[
+      {tag:'Recursion Basics',title:'Chapter I — The Hall of Mirrors',
+       story:'The wizard\'s hall has mirrors within mirrors. <strong>Recursion</strong>: a function that calls itself with a <strong>smaller input</strong>, until a <strong>base case</strong> stops it. factorial(5) = 5 × factorial(4) = 5 × 4 × factorial(3)...',
+       visual:{type:'array',items:['fact(3)','fact(2)','fact(1)','BASE: 1'],hi:[3]},
+       q:'What prevents infinite recursion?',type:'mcq',
+       opts:['A loop','The base case','Stack size','A queue'],correct:1,hiOnReveal:[],
+       fb_good:'The base case! It\'s the condition where the function stops calling itself. Without it — stack overflow!',
+       fb_bad:'Without a base case, recursion never stops → Stack Overflow. Base case = stopping condition.',
+       concept:'Recursion: function calls itself with smaller input. Base case stops it. Uses the call stack.',xp:10},
+      {tag:'Fibonacci',title:'Chapter II — The Golden Sequence',
+       story:'The Fibonacci spiral appears throughout Arrayonia\'s architecture. fib(n) = fib(n-1) + fib(n-2). Base cases: fib(0)=0, fib(1)=1. So fib(5) = 5, fib(6) = 8...',
+       visual:{type:'array',items:['0','1','1','2','3','5','8'],hi:[5,6]},
+       q:'What is fib(7)? (fib sequence: 0,1,1,2,3,5,8,...)',type:'mcq',
+       opts:['11','12','13','14'],correct:2,hiOnReveal:[],
+       fb_good:'Yes! fib(7) = fib(6)+fib(5) = 8+5 = 13.',
+       fb_bad:'fib(7) = fib(6)+fib(5) = 8+5 = 13. Count: 0,1,1,2,3,5,8,13.',
+       concept:'Fibonacci: fib(n)=fib(n-1)+fib(n-2). Naive recursion is O(2^n). Memoized is O(n).',xp:10},
+      {tag:'Memoization',title:'Chapter III — The Memory Potion',
+       story:'Naive fib(50) recalculates fib(10) thousands of times — wasteful! <strong>Memoization</strong>: store results in a cache. First time fib(k) is computed, save it. Next time, instantly look it up. O(2^n) → <strong>O(n)</strong>!',
+       visual:{type:'hash',pairs:[{k:'fib(3)',v:'2',idx:1},{k:'fib(4)',v:'3',idx:3},{k:'fib(5)',v:'5',idx:5}],size:7},
+       q:'With memoization, fib(50) takes how long?',type:'mcq',
+       opts:['O(2^50)','O(50²)','O(50)','O(log 50)'],correct:2,hiOnReveal:[],
+       fb_good:'O(n)! Each fib(k) is computed once and cached. 50 lookups total.',
+       fb_bad:'Memoization computes each subproblem once. fib(50) = 50 computations = O(n).',
+       concept:'Memoization = top-down DP. Cache subproblem results. Converts exponential to linear time.',xp:10},
+      {tag:'Dynamic Programming',title:'Chapter IV — The Optimal Kingdom',
+       story:'<strong>Dynamic Programming</strong> solves complex problems by breaking them into overlapping subproblems and solving each once. Bottom-up DP fills a table iteratively. Classic: Coin Change, Knapsack, Longest Common Subsequence.',
+       visual:{type:'dp',headers:['0','1','2','3','4','5'],rows:[{label:'dp',vals:['0','1','1','2','1','2']}]},
+       q:'DP is best applied when a problem has which two properties?',type:'mcq',
+       opts:['Fast loops + sorted data','Optimal substructure + overlapping subproblems','Recursion + graphs','Hashing + sorting'],correct:1,hiOnReveal:[],
+       fb_good:'Optimal substructure (optimal solution contains optimal subsolutions) + overlapping subproblems (same sub-calls repeated). That\'s DP!',
+       fb_bad:'DP requires: (1) Optimal substructure — build solution from optimal sub-solutions, (2) Overlapping subproblems — reuse cached results.',
+       concept:'DP: optimal substructure + overlapping subproblems. Memoization (top-down) or tabulation (bottom-up).',xp:10},
+    ]
+  },
+  {
+    id:'binary-search', name:'Binary Search', icon:'🔍', color:'#4fc3f7',
+    desc:'The Oracle Divide. Logarithmic search on sorted data.',
+    totalXP:20,
+    chapters:[
+      {tag:'Binary Search',title:'Chapter I — The Oracle\'s Divide',
+       story:'To find a number in a <strong>sorted</strong> array, the Oracle always checks the <strong>middle</strong>. If target < mid → search left half. If target > mid → search right half. Repeat. Array of 1024 elements: finds any item in max <strong>10 steps</strong>!',
+       visual:{type:'bsearch',items:[10,20,30,40,50,60,70,80],target:4,lo:0,hi:7,mid:3},
+       q:'Searching for 50 in [10,20,30,40,50,60,70,80]. First mid = index 3 (value 40). 50 > 40, so next we search...?',type:'mcq',
+       opts:['Left half [10-40]','Right half [50-80]','From index 0','The whole array again'],correct:1,hiOnReveal:[],
+       fb_good:'Right half! 50>40 so we eliminate the entire left half in one step. This is why it\'s O(log n).',
+       fb_bad:'50 > 40 (mid value) → search right half [50,60,70,80]. Eliminate half the array each step!',
+       concept:'Binary Search: O(log n). Requires sorted array. Halves search space each step.',xp:10},
+      {tag:'Binary Search Complexity',title:'Chapter II — The Power of Halving',
+       story:'Binary Search on 1 billion elements takes at most <strong>30 comparisons</strong> (log₂(1,000,000,000) ≈ 30). Linear search would take up to 1 billion. This is the power of <strong>O(log n)</strong> vs <strong>O(n)</strong>.',
+       visual:{type:'sort',items:[10,20,30,40,50,60,70,80],cmp:[4]},
+       q:'Binary search on n=1024 elements takes at most how many comparisons?',type:'mcq',
+       opts:['1024','512','10','100'],correct:2,hiOnReveal:[],
+       fb_good:'log₂(1024) = 10. At most 10 comparisons! Linear search could take 1024.',
+       fb_bad:'log₂(1024) = 10. Each step halves. 1024→512→256→...→1. 10 steps.',
+       concept:'Binary Search: log₂(n) steps max. n=10^9 → 30 steps. n=10^6 → 20 steps.',xp:10},
+    ]
+  },
+  {
+    id:'two-pointers', name:'Two Pointers & Sliding Window', icon:'👁️', color:'#ffb74d',
+    desc:'The Dual Scouts. Efficient linear techniques for array problems.',
+    totalXP:20,
+    chapters:[
+      {tag:'Two Pointers',title:'Chapter I — The Bridge Guards',
+       story:'Two guards stand at <strong>opposite ends</strong> of a sorted array. They march inward, checking pairs. Array = [1,3,5,7,9], target sum = 10. Left at index 0 (val 1), Right at index 4 (val 9). 1+9=10 — found!',
+       visual:{type:'twoptr',items:[1,3,5,7,9],l:0,r:4},
+       q:'Two pointers work on sorted arrays and give what time complexity?',type:'mcq',
+       opts:['O(n²)','O(n log n)','O(n)','O(1)'],correct:2,hiOnReveal:[],
+       fb_good:'O(n)! Each pointer moves at most n steps total. Much better than O(n²) brute force.',
+       fb_bad:'Two pointers: each pointer moves at most n steps. Total = O(n), vs O(n²) nested loops.',
+       concept:'Two Pointers: O(n) on sorted arrays. Left/right converge. Beats O(n²) brute force.',xp:10},
+      {tag:'Sliding Window',title:'Chapter II — The Moving Window',
+       story:'Find the max sum of any <strong>3 consecutive</strong> elements in [2,1,5,1,3,2]. Use a window of size 3. Start: sum(2+1+5)=8. Slide: subtract leftmost, add new right. sum(1+5+1)=7. Max window = 8.',
+       visual:{type:'array',items:[2,1,5,1,3,2],hi:[0,1,2]},
+       q:'Sliding window avoids recomputing the whole sum by...?',type:'mcq',
+       opts:['Sorting first','Subtracting left + adding right','Using recursion','Binary search'],correct:1,hiOnReveal:[],
+       fb_good:'Exactly! Slide: new_sum = old_sum − left_element + new_right. O(n) instead of O(n×k).',
+       fb_bad:'Sliding: remove left element, add new right element. Reuse O(k) work in O(1). Total: O(n).',
+       concept:'Sliding Window: maintain a window, slide by subtracting left and adding right. O(n) for fixed/variable windows.',xp:10},
+    ]
+  },
+];
+
+let totalXP = 0;
+let worldProgress = {};
+WORLDS.forEach(w=>{ worldProgress[w.id]={done:false,xp:0,chIdx:0}; });
+
+let currentWorld = null;
+let currentChIdx = 0;
+let answered = false;
+let traverseStep = 0, searchStep = 0;
+
+// ── SCREENS ──────────────────────────────────────────────────────────────────
+function showScreen(id){
+  ['landing','world-map','game-screen','end-screen'].forEach(s=>{
+    document.getElementById(s).classList.toggle('hidden', s!==id);
+  });
+}
+
+function showWorldMap(){
+  showScreen('world-map');
+  document.getElementById('hud-xp').classList.remove('hidden');
+  document.getElementById('hud-ch').classList.add('hidden');
+  document.getElementById('back-map-btn') && document.getElementById('back-map-btn').classList.add('hidden');
+  renderWorldMap();
+}
+
+function renderWorldMap(){
+  document.getElementById('hud-xp-val').textContent = totalXP;
+  const grid = document.getElementById('worlds-grid');
+  grid.innerHTML = WORLDS.map((w,i)=>{
+    const prog = worldProgress[w.id];
+    const locked = i > 0 && !worldProgress[WORLDS[i-1].id].done;
+    const done = prog.done;
+    const statusBadge = done ? '<span class="wc-badge done">✓ Complete</span>' : locked ? '<span class="wc-badge locked">🔒 Locked</span>' : '<span class="wc-badge open">Open</span>';
+    return `<div class="world-card${locked?' locked':''}" onclick="${locked?'':'startWorld(\''+w.id+'\')'}" style="--wc:${w.color}">
+      ${locked?'<span class="lock-icon">🔒</span>':''}
+      <div class="wc-icon">${w.icon}</div>
+      <div class="wc-name">${w.name}</div>
+      <div class="wc-desc">${w.desc}</div>
+      <div class="wc-meta">${statusBadge}<span class="wc-xp">${prog.xp}/${w.totalXP} XP</span></div>
+    </div>`;
+  }).join('');
+  document.getElementById('landing-xp') && (document.getElementById('landing-xp').textContent='Total XP: '+totalXP+' / 400');
+}
+
+function startWorld(worldId){
+  currentWorld = WORLDS.find(w=>w.id===worldId);
+  currentChIdx = worldProgress[worldId].chIdx || 0;
+  if(worldProgress[worldId].done) currentChIdx = 0;
+  showScreen('game-screen');
+  document.getElementById('hud-xp').classList.remove('hidden');
+  document.getElementById('hud-ch').classList.remove('hidden');
+  renderChapter();
+}
+
+function goToWorldMap(){
+  showScreen('world-map');
+  document.getElementById('hud-ch').classList.add('hidden');
+  renderWorldMap();
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────────────
+function updateHUD(){
+  document.getElementById('hud-xp-val').textContent = totalXP;
+  document.getElementById('hud-ch-label').textContent = `Ch ${currentChIdx+1} / ${currentWorld.chapters.length}`;
+  document.getElementById('hud-ch-world').textContent = currentWorld.name;
+  document.getElementById('hud-ch-fill').style.width = ((currentChIdx/currentWorld.chapters.length)*100)+'%';
+}
+
+function cell(v,i,cls=''){
+  return `<div class="arr-cell"><div class="arr-cell-inner ${cls}" id="ac-${i}"><span class="cell-val">${v}</span><span class="cell-idx">[${i}]</span></div></div>`;
+}
+function makeArray(items,hi=[],act=-1,extra={}){
+  return `<div class="arr-visual">${items.map((it,i)=>{
+    let c = extra[i]||'';
+    if(i===act) c='act';
+    else if(hi.includes(i)) c='hi';
+    return cell(it,i,c);
+  }).join('')}</div>`;
+}
+function makeLL(nodes,hi=[]){
+  return `<div class="ll-visual">${nodes.map((n,i)=>{
+    const hc=hi.includes(i)?'hi':'';
+    return `<div class="ll-node"><div class="ll-box ${hc}"><span class="ll-val">${n}</span><span class="ll-ptr">next→</span></div>${i<nodes.length-1?'<span class="ll-arrow">→</span>':''}</div>`;
+  }).join('')}<span class="ll-null">NULL</span></div>`;
+}
+function makeStack(items,topIdx){
+  const disp=[...items];
+  return `<div style="display:flex;flex-direction:column;align-items:flex-start;">
+    <div class="stack-label" style="margin-bottom:4px;text-align:left;">▲ TOP</div>
+    <div class="stack-visual">${disp.map((it,i)=>`<div class="stack-item${i===topIdx?' top-item':''}">${it}</div>`).join('')}</div>
+    <div class="stack-label">▼ BOTTOM</div></div>`;
+}
+function makeQueue(items){
+  return `<div style="display:flex;flex-direction:column;gap:6px;"><div style="display:flex;align-items:center;gap:5px;">
+    <span class="q-end-label">FRONT→</span>
+    <div class="queue-visual">${items.map((it,i)=>`<div class="queue-item${i===0?' front':i===items.length-1?' rear':''}">${it}</div>`).join('')}</div>
+    <span class="q-end-label">←REAR</span></div></div>`;
+}
+function makeTree(nodes,edges,hi=[]){
+  const W=400,H=190;
+  const circles=nodes.map((n,i)=>{
+    const hc=hi.includes(i)?'stroke="#69f0ae" fill="rgba(105,240,174,0.12)"':'stroke="rgba(245,197,66,0.4)" fill="rgba(18,22,44,0.95)"';
+    const tc=hi.includes(i)?'#69f0ae':'#ffffff';
+    return `<circle cx="${n.x}" cy="${n.y}" r="18" ${hc} stroke-width="1.5"/><text x="${n.x}" y="${n.y+4}" text-anchor="middle" fill="${tc}" font-size="11" font-family="Cinzel">${n.v}</text>`;
+  }).join('');
+  const lines=edges.map(([a,b])=>`<line x1="${nodes[a].x}" y1="${nodes[a].y}" x2="${nodes[b].x}" y2="${nodes[b].y}" stroke="rgba(245,197,66,0.2)" stroke-width="1.5"/>`).join('');
+  return `<div class="tree-visual"><svg width="100%" viewBox="0 0 ${W} ${H}" class="graph-svg">${lines}${circles}</svg></div>`;
+}
+function makeGraph(nodes,edges,directed,hi=[]){
+  const W=400,H=210;
+  const lines=edges.map(([a,b])=>{
+    const na=nodes[a],nb=nodes[b];
+    const hc=hi.includes(a)&&hi.includes(b)?'rgba(255,183,77,0.7)':'rgba(255,183,77,0.25)';
+    return `<line x1="${na.x}" y1="${na.y}" x2="${nb.x}" y2="${nb.y}" stroke="${hc}" stroke-width="1.5"/>`;
+  }).join('');
+  const circles=nodes.map((n,i)=>{
+    const hc=hi.includes(i)?'fill="rgba(255,183,77,0.15)" stroke="#ffb74d"':'fill="rgba(18,22,44,0.95)" stroke="rgba(255,183,77,0.35)"';
+    const tc=hi.includes(i)?'#ffb74d':'#ffffff';
+    return `<circle cx="${n.x}" cy="${n.y}" r="20" ${hc} stroke-width="1.5"/><text x="${n.x}" y="${n.y+4}" text-anchor="middle" fill="${tc}" font-size="11" font-family="Cinzel">${n.label}</text>`;
+  }).join('');
+  return `<div class="tree-visual"><svg width="100%" viewBox="0 0 ${W} ${H}" class="graph-svg">${lines}${circles}</svg></div>`;
+}
+function makeHash(pairs,size){
+  const rows=Array.from({length:size},(_,i)=>{
+    const p=pairs.find(x=>x.idx===i);
+    return `<div class="hash-row"><span class="hash-idx-lbl">[${i}]</span><div class="hash-cell${p?' filled':' empty'}">${p?`"${p.k}" → ${p.v}`:'—'}</div></div>`;
+  }).join('');
+  return `<div class="hash-visual">${rows}</div>`;
+}
+function makeSort(items,cmp=[]){
+  const max=Math.max(...items);
+  return `<div class="sort-visual">${items.map((v,i)=>{
+    const h=Math.round((v/max)*70)+10;
+    const c=cmp.includes(i)?'cmp':'';
+    return `<div class="sort-bar ${c}" style="height:${h}px;width:44px;"><span>${v}</span></div>`;
+  }).join('')}</div>`;
+}
+function makeDP(headers,rows){
+  const ths=headers.map(h=>`<th>${h}</th>`).join('');
+  const trs=rows.map(r=>`<tr><td style="color:var(--muted);font-size:11px;">${r.label}</td>${r.vals.map((v,i)=>`<td class="${v!=='?'?'filled':''}">${v}</td>`).join('')}</tr>`).join('');
+  return `<table class="dp-table"><tr><th></th>${ths}</tr>${trs}</table>`;
+}
+function makeTwoPtr(items,l,r){
+  return `<div class="arr-visual">${items.map((it,i)=>{
+    let c=(i===l||i===r)?'hi':'';
+    return `<div class="arr-cell"><div class="arr-cell-inner ${c}">
+      <span class="cell-val">${it}</span>
+      <span class="cell-idx">${i===l?'L':i===r?'R':('['+i+']')}</span>
+    </div></div>`;
+  }).join('')}</div>`;
+}
+function makeBSearch(items,target,lo,hi,mid){
+  return `<div class="arr-visual">${items.map((it,i)=>{
+    let c=i===mid?'hi':i===target?'act':(i<lo||i>hi)?'wrg':'';
+    return cell(it,i,c);
+  }).join('')}</div>`;
+}
+
+function buildVisual(v){
+  if(!v) return '';
+  switch(v.type){
+    case 'array': return makeArray(v.items,v.hi||[]);
+    case 'traverse': return `<div id="vis-area">${makeArray(v.items,[],0)}</div><p class="traverse-label" id="trav-lbl">Click Step to begin →</p><button class="step-btn" id="step-btn" onclick="stepTrav()">▶ Step</button>`;
+    case 'search': return `<div id="vis-area">${makeArray(v.items)}</div><button class="step-btn" id="step-btn" onclick="stepSearch()">▶ Search next</button>`;
+    case 'll': return makeLL(v.nodes,v.hi||[]);
+    case 'stack': return makeStack(v.items,v.topIdx);
+    case 'queue': return makeQueue(v.items);
+    case 'tree': return makeTree(v.nodes,v.edges,v.hi||[]);
+    case 'graph': return makeGraph(v.nodes,v.edges,v.directed,v.hi||[]);
+    case 'hash': return makeHash(v.pairs,v.size);
+    case 'sort': return makeSort(v.items,v.cmp||[]);
+    case 'dp': return makeDP(v.headers,v.rows);
+    case 'twoptr': return makeTwoPtr(v.items,v.l,v.r);
+    case 'bsearch': return makeBSearch(v.items,v.target,v.lo,v.hi,v.mid);
+    case 'reverse':
+      return `<div id="vis-area">${makeArray(v.items,[0,v.items.length-1])}</div><button class="step-btn" onclick="animRev()">✦ Cast Spell</button>`;
+    default: return '';
+  }
+}
+
+function buildQuestion(ch){
+  if(ch.type==='mcq'){
+    return `<div class="options-grid">${ch.opts.map((o,i)=>`<button class="opt-btn" id="opt-${i}" onclick="answerMCQ(${i})">${o}</button>`).join('')}</div>`;
+  } else {
+    return `<div class="type-row"><input class="type-input" id="type-in" placeholder="Type your answer..."/><button class="submit-btn" onclick="answerType()">Submit</button></div>`;
+  }
+}
+
+function renderChapter(){
+  answered=false; traverseStep=0; searchStep=0;
+  updateHUD();
+  const ch=currentWorld.chapters[currentChIdx];
+  document.getElementById('game-inner').innerHTML=`
+    <div class="chapter-card anim-in">
+      <div class="ch-tag">${ch.tag}</div>
+      <div class="ch-title">${ch.title}</div>
+      <div class="ch-story">${ch.story}</div>
+      ${buildVisual(ch.visual)}
+    </div>
+    <div class="question-card anim-in" style="animation-delay:.1s">
+      <div class="q-label">Your Quest</div>
+      <div class="q-text">${ch.q}</div>
+      ${buildQuestion(ch)}
+      <div id="fb-area"></div>
+      <div id="nxt-area"></div>
+    </div>
+    <div class="concept-box anim-in" style="animation-delay:.2s">
+      <span>Concept Scroll</span> — ${ch.concept}
+    </div>`;
+  document.getElementById('game-screen').scrollTop=0;
+}
+
+// ── ANIMATIONS ───────────────────────────────────────────────────────────────
+function stepTrav(){
+  const items=currentWorld.chapters[currentChIdx].visual.items;
+  if(traverseStep>=items.length) return;
+  document.getElementById('vis-area').innerHTML=makeArray(items,[],traverseStep);
+  document.getElementById('trav-lbl').textContent=`Visiting [${traverseStep}]: "${items[traverseStep]}"`;
+  traverseStep++;
+  if(traverseStep>=items.length){const b=document.getElementById('step-btn');b.textContent='✓ Done!';b.disabled=true;}
+}
+function stepSearch(){
+  const ch=currentWorld.chapters[currentChIdx];
+  const items=ch.visual.items, tgt=ch.visual.target||2;
+  if(searchStep>tgt) return;
+  const cells=items.map((it,i)=>{
+    let c=i<searchStep?'wrg':(i===searchStep&&i===tgt)?'act':'';
+    return `<div class="arr-cell"><div class="arr-cell-inner ${c}"><span class="cell-val">${it}</span><span class="cell-idx">[${i}]</span></div></div>`;
+  }).join('');
+  document.getElementById('vis-area').innerHTML=`<div class="arr-visual">${cells}</div>`;
+  if(searchStep===tgt){const b=document.getElementById('step-btn');b.textContent='✓ Found!';b.disabled=true;}
+  searchStep++;
+}
+function animRev(){
+  const v=currentWorld.chapters[currentChIdx].visual;
+  const orig=[...v.items];
+  const rev=[...v.items].reverse();
+  let t=0;
+  const iv=setInterval(()=>{
+    document.getElementById('vis-area').innerHTML=makeArray(t%2===0?orig:rev,[0,orig.length-1]);
+    t++;
+    if(t>6) clearInterval(iv);
+  },500);
+}
+
+// ── ANSWERS ──────────────────────────────────────────────────────────────────
+function showFeedback(ok){
+  const ch=currentWorld.chapters[currentChIdx];
+  document.getElementById('fb-area').innerHTML=`<div class="feedback-box ${ok?'good':'bad'}">${ok?ch.fb_good:ch.fb_bad}</div>`;
+  const isLast=currentChIdx>=currentWorld.chapters.length-1;
+  document.getElementById('nxt-area').innerHTML=`<button class="next-btn" onclick="nextChapter()" style="margin-top:14px">${isLast?'Complete World!':'Continue Quest →'}</button>`;
+}
+
+function answerMCQ(idx){
+  if(answered) return;
+  answered=true;
+  const ch=currentWorld.chapters[currentChIdx];
+  document.querySelectorAll('.opt-btn').forEach(b=>b.disabled=true);
+  document.querySelector(`#opt-${ch.correct}`).classList.add('correct');
+  const ok=idx===ch.correct;
+  if(!ok) document.querySelector(`#opt-${idx}`).classList.add('incorrect');
+  if(ok){totalXP+=ch.xp;worldProgress[currentWorld.id].xp+=ch.xp;}
+  updateHUD();
+  showFeedback(ok);
+}
+
+function answerType(){
+  if(answered) return;
+  const ch=currentWorld.chapters[currentChIdx];
+  const val=(document.getElementById('type-in').value||'').trim().toUpperCase();
+  const ok=val===(ch.correct_text||'').toUpperCase();
+  answered=true;
+  if(ok){totalXP+=ch.xp;worldProgress[currentWorld.id].xp+=ch.xp;}
+  updateHUD();
+  showFeedback(ok);
+}
+
+function nextChapter(){
+  currentChIdx++;
+  if(currentChIdx>=currentWorld.chapters.length){
+    worldProgress[currentWorld.id].done=true;
+    worldProgress[currentWorld.id].chIdx=0;
+    const allDone=WORLDS.every(w=>worldProgress[w.id].done);
+    if(allDone){
+      showEndScreen();
+    } else {
+      goToWorldMap();
+    }
+  } else {
+    worldProgress[currentWorld.id].chIdx=currentChIdx;
+    renderChapter();
+    document.getElementById('game-screen').scrollTop=0;
+  }
+}
+
+function showEndScreen(){
+  showScreen('end-screen');
+  document.getElementById('hud-ch').classList.add('hidden');
+  document.getElementById('end-xp-val').textContent=totalXP+' / 400 XP Earned';
+  const badges=WORLDS.map(w=>w.name);
+  document.getElementById('end-badges').innerHTML=badges.map(b=>`<div class="badge">${b}</div>`).join('');
+}
+
+function fullRestart(){
+  totalXP=0;
+  WORLDS.forEach(w=>{worldProgress[w.id]={done:false,xp:0,chIdx:0};});
+  currentWorld=null; currentChIdx=0;
+  showScreen('landing');
+  document.getElementById('hud-xp').classList.add('hidden');
+  document.getElementById('hud-ch').classList.add('hidden');
+}
+</script>
+</body>
+</html>
